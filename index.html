@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+  <head>
+    <title id="title"></title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: 0.5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+    </style>
+  </head>
+  <body>
+    <button id="logout" onclick="handleLogout()">Logout</button>
+    <button id="show_online" onclick="handleShowOnline()">Show online users</button>
+    <button id="hide_online" onclick="handleHideOnline()">Hide online users</button>
+    <p id="online-users"></p>
+    <ul id="messages"></ul>
+    <form action="">
+      <input id="m" autocomplete="off" /><button>Send</button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script>
+      var socket = io();
+      function handleNickname() {
+        if (!localStorage.getItem("nickname")){
+          let nickname = window.prompt("enter your nickname");
+          if (nickname){
+            localStorage.setItem("nickname", nickname);
+            socket.emit('user-connected', nickname);
+          } else {
+            window.location.href = "http://localhost:3000/";
+          }
+        } else {
+          document.getElementById("title").text = "Socket.IO chat - " + localStorage.getItem("nickname");
+        }
+      }
+
+      function handleSendMessage() {
+        $('form').submit(function(e) {
+            e.preventDefault();
+            let nickname = localStorage.getItem("nickname");
+            let data = {
+              nickname: nickname,
+              message: $('#m').val()
+            };
+            socket.emit('chat message', data);
+        $('#m').val('');
+        return false;
+        });
+      }
+
+      function handleReceiveMessage(params) {
+        socket.on('chat message', function (msg) {
+          $('#messages').append($('<li>').text(msg));
+        })
+      }
+
+      function handleLogout() {
+        socket.emit('user-logout', localStorage.getItem("nickname"));
+        localStorage.removeItem("nickname");
+        window.location.href = "http://localhost:3000";
+      }
+
+      function handleLogoutMessage() {
+        socket.on('user-logged-out', function (msg) {
+          $('#messages').append($('<li>').text(msg));
+        })
+      }
+
+      function handleUserConnected() {
+        if (localStorage.getItem("nickname")){
+          socket.on('user-connected', function (msg) {
+            $('#messages').append($('<li>').text(msg));
+          })
+        } else {
+          handleNickname();
+        }
+      }
+
+      function handleShowOnline() {
+        socket.emit("show-online");
+        socket.on("show-online", (users_data) => {
+          message = `total : ${users_data.count}, user: `
+          users_data.users.map((data) => {
+            message += `${data} `
+          })
+          $('#online-users').text(message);
+        })
+      }
+
+      function handleHideOnline() {
+        $('#online-users').text('');
+      }
+
+      $(function () {
+        handleNickname();
+        handleLogoutMessage();
+        handleSendMessage();
+        handleReceiveMessage();
+        handleUserConnected();
+      });
+    </script>
+  </body>
+</html>
